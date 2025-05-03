@@ -3,7 +3,7 @@ import 'features/stories/screens/new_story_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
-  await dotenv.load(); // Load .env file
+  await dotenv.load(fileName: ".env"); // Load .env file
   runApp(const MyApp());
 }
 
