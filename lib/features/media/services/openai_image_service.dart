@@ -1,32 +1,36 @@
+// lib/services/openai_image_service.dart
 import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class OpenAIImageService {
-  static Future<String?> generateImage(String prompt) async {
-    final apiKey = dotenv.env['OPENAI_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
-      print('Missing OpenAI API key');
-      return null;
-    }
+  final String firebaseFunctionUrl =
+      'https://us-central1-storybridgeapp-4993a.cloudfunctions.net/proxyDalleImage';
 
-    final url = Uri.parse('https://api.openai.com/v1/images/generations');
+  Future<String?> generateImage(String prompt) async {
+    try {
+      final response = await http.post(
+        Uri.parse(firebaseFunctionUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'prompt': prompt}),
+      );
 
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $apiKey',
-      },
-      body: jsonEncode({'prompt': prompt, 'n': 1, 'size': '512x512'}),
-    );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final imageUrl = data['imageUrl'];
+        print('Generated image URL: $imageUrl');
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final imageUrl = data['data'][0]['url'];
-      return imageUrl;
-    } else {
-      print('OpenAI image error: ${response.body}');
+        if (imageUrl != null && imageUrl.startsWith('http')) {
+          return imageUrl;
+        } else {
+          print('Image URL invalid or missing.');
+          return null;
+        }
+      } else {
+        print('Error from Firebase Function: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Image generation error: $e');
       return null;
     }
   }

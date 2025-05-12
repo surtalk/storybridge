@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:storybridge_app/features/media/widgets/FullImageScreen.dart';
 import 'package:storybridge_app/features/stories/models/story_page.dart';
 import 'package:storybridge_app/features/media/services/openai_text_service.dart';
 import 'package:storybridge_app/features/media/services/openai_image_service.dart';
@@ -17,10 +20,11 @@ class StoryEditorScreen extends StatefulWidget {
 
 class _StoryEditorScreenState extends State<StoryEditorScreen> {
   final FlutterTts flutterTts = FlutterTts();
-  final List<StoryPage> _storyPages = [StoryPage(text: '')];
+  final List<StoryPage> _storyPages = [StoryPage(text: '', imageUrl: null)];
   final List<TextEditingController> _controllers = [TextEditingController()];
   final List<String?> _aiSuggestions = [];
-
+  final _imageService = OpenAIImageService();
+  final _textService = OpenAiTextService();
   @override
   void dispose() {
     for (final controller in _controllers) {
@@ -32,7 +36,7 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
 
   void _addNewPage() {
     setState(() {
-      _storyPages.add(StoryPage(text: ''));
+      _storyPages.add(StoryPage(text: '', imageUrl: null));
       _controllers.add(TextEditingController());
       _aiSuggestions.add(null);
     });
@@ -50,7 +54,7 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
 
   Future<void> _generateAISuggestion(int index) async {
     final prompt = _controllers[index].text;
-    final suggestion = await OpenAITextService.generateNextLine(prompt);
+    final suggestion = await _textService.fetchAISuggestion(prompt);
     if (suggestion != null) {
       setState(() {
         _aiSuggestions[index] = suggestion;
@@ -59,26 +63,43 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
   }
 
   Future<void> _generateAIImage(int index) async {
+    if (index >= _controllers.length || index >= _storyPages.length) return;
+
     final prompt = _controllers[index].text;
-    final imageUrl = await OpenAIImageService.generateImage(prompt);
-    if (imageUrl != null) {
+    if (prompt.isEmpty) return;
+
+    final imageUrl = await _imageService.generateImage(prompt);
+    if (imageUrl != null && index < _storyPages.length) {
       setState(() {
+        print("image url" + imageUrl);
         _storyPages[index].imageUrl = imageUrl;
       });
     }
   }
 
   Future<void> _uploadImage(int index) async {
-    final imageFile = await ImagePickerService.pickImageFromGallery();
-    if (imageFile != null) {
-      setState(() {
-        _storyPages[index].imageUrl = imageFile.path;
-      });
-    }
+    final picker = ImagePickerService();
+    final (path, bytes) = await picker.pickImageFromGallery();
+
+    setState(() {
+      if (kIsWeb) {
+        _storyPages[index].webImageBytes = bytes;
+        _storyPages[index].imageUrl = null;
+      } else {
+        _storyPages[index].imageUrl = path;
+        _storyPages[index].webImageBytes = null;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Defensive check to avoid index issues
+    if (_controllers.length != _storyPages.length ||
+        _aiSuggestions.length != _storyPages.length) {
+      debugPrint('List lengths are inconsistent!');
+      return const Center(child: CircularProgressIndicator());
+    }
     return Scaffold(
       appBar: AppBar(title: Text(widget.storyTitle)),
       body: ListView.builder(
@@ -156,17 +177,93 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  if (_storyPages[index].imageUrl != null)
-                    _storyPages[index].imageUrl!.startsWith('http')
-                        ? Image.network(
-                          _storyPages[index].imageUrl!,
-                          height: 200,
-                        )
-                        : Image.file(
-                          File(_storyPages[index].imageUrl!),
-                          height: 200,
-                        ),
+                  if (_storyPages[index].imageUrl != null ||
+                      _storyPages[index].webImageBytes != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => FullImageScreen(
+                                    imageUrl:
+                                        _storyPages[index].imageUrl!.startsWith(
+                                              'http',
+                                            )
+                                            ? 'https://us-central1-storybridgeapp-4993a.cloudfunctions.net/proxyDalleImageGet?url=${Uri.encodeComponent(_storyPages[index].imageUrl!)}'
+                                            : _storyPages[index].imageUrl,
+                                    imageBytes:
+                                        _storyPages[index].webImageBytes,
+                                  ),
+                            ),
+                          );
+                        },
+                        child:
+                            kIsWeb
+                                ? _storyPages[index].imageUrl != null &&
+                                        _storyPages[index].imageUrl!.startsWith(
+                                          'http',
+                                        )
+                                    ? Image.network(
+                                      'https://us-central1-storybridgeapp-4993a.cloudfunctions.net/proxyDalleImageGet?url=${Uri.encodeComponent(_storyPages[index].imageUrl!)}',
+                                      width: double.infinity,
+                                      height: 200,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Text(
+                                                'Failed to load image.',
+                                                style: TextStyle(
+                                                  color: Colors.red,
+                                                ),
+                                              ),
+                                    )
+                                    : Image.memory(
+                                      _storyPages[index].webImageBytes!,
+                                      width: double.infinity,
+                                      height: 200,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Text(
+                                                'Failed to load image.',
+                                                style: TextStyle(
+                                                  color: Colors.red,
+                                                ),
+                                              ),
+                                    )
+                                : _storyPages[index].imageUrl != null &&
+                                    _storyPages[index].imageUrl!.startsWith(
+                                      'http',
+                                    )
+                                ? Image.network(
+                                  'https://us-central1-storybridgeapp-4993a.cloudfunctions.net/proxyDalleImageGet?url=${Uri.encodeComponent(_storyPages[index].imageUrl!)}',
+                                  width: double.infinity,
+                                  height: 200,
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (context, error, stackTrace) =>
+                                          const Text(
+                                            'Failed to load image.',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                )
+                                : Image.file(
+                                  File(_storyPages[index].imageUrl!),
+                                  width: double.infinity,
+                                  height: 200,
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (context, error, stackTrace) =>
+                                          const Text(
+                                            'Failed to load image.',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                ),
+                      ),
+                    ),
                 ],
               ),
             ),

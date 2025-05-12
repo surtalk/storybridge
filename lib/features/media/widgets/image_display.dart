@@ -11,7 +11,8 @@ class ImageDisplay extends StatelessWidget {
   Widget build(BuildContext context) {
     if (imageFile != null) {
       return Image.file(imageFile!, height: 200);
-    } else if (imageUrl != null) {
+    } else if (imageUrl != null &&
+        Uri.tryParse(imageUrl!)?.hasAbsolutePath == true) {
       return Image.network(imageUrl!, height: 200);
     } else {
       return const SizedBox(

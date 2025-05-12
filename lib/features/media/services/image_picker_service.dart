@@ -1,13 +1,19 @@
-import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ImagePickerService {
-  static Future<File?> pickImageFromGallery() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      return File(pickedFile.path);
+  final ImagePicker _picker = ImagePicker();
+
+  Future<(String? path, Uint8List? bytes)> pickImageFromGallery() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return (null, null);
+
+    if (kIsWeb) {
+      final bytes = await image.readAsBytes();
+      return (null, bytes); // No File path on web
+    } else {
+      return (image.path, null); // No bytes needed on mobile
     }
-    return null;
   }
 }
