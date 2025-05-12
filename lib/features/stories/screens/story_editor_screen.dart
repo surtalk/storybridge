@@ -53,16 +53,23 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
   }
 
   Future<void> _generateAISuggestion(int index) async {
+    setState(() {
+      _storyPages[index].isLoading = true;
+    });
     final prompt = _controllers[index].text;
     final suggestion = await _textService.fetchAISuggestion(prompt);
     if (suggestion != null) {
       setState(() {
         _aiSuggestions[index] = suggestion;
+        _storyPages[index].isLoading = false;
       });
     }
   }
 
   Future<void> _generateAIImage(int index) async {
+    setState(() {
+      _storyPages[index].isLoading = true;
+    });
     if (index >= _controllers.length || index >= _storyPages.length) return;
 
     final prompt = _controllers[index].text;
@@ -73,6 +80,7 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
       setState(() {
         print("image url" + imageUrl);
         _storyPages[index].imageUrl = imageUrl;
+        _storyPages[index].isLoading = false;
       });
     }
   }
@@ -124,6 +132,7 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
                     },
                   ),
                   const SizedBox(height: 8),
+
                   Row(
                     children: [
                       ElevatedButton.icon(
@@ -177,6 +186,11 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
                       ),
                     ],
                   ),
+                  if (_storyPages[index].isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
                   if (_storyPages[index].imageUrl != null ||
                       _storyPages[index].webImageBytes != null)
                     Padding(
