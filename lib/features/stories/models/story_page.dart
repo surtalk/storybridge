@@ -5,6 +5,7 @@ class StoryPage {
   String? aiSuggestion;
   String? imageUrl;
   Uint8List? webImageBytes;
+
   bool isLoading;
   StoryPage({
     required this.text,

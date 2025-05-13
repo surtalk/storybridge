@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -11,7 +10,7 @@ import 'package:storybridge_app/features/media/services/image_picker_service.dar
 
 class StoryEditorScreen extends StatefulWidget {
   final String storyTitle;
-
+  static const int maxImagesPerPage = 3;
   const StoryEditorScreen({super.key, required this.storyTitle});
 
   @override
