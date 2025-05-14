@@ -1,4 +1,4 @@
-package com.example.storybridge_app
+package com.au.StoryBridge
 
 import io.flutter.embedding.android.FlutterActivity
 
