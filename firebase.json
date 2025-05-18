@@ -1,15 +1,1 @@
-{
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
-      ]
-    }
-  ]
-}
+{"functions":[{"source":"functions","codebase":"default","ignore":["node_modules",".git","firebase-debug.log","firebase-debug.*.log","*.local"]}],"flutter":{"platforms":{"android":{"default":{"projectId":"storybridgeapp-4993a","appId":"1:1056200996320:android:175d85e5b7b16a68622785","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"storybridgeapp-4993a","configurations":{"android":"1:1056200996320:android:175d85e5b7b16a68622785","ios":"1:1056200996320:ios:522fdfe864e203c1622785","macos":"1:1056200996320:ios:522fdfe864e203c1622785","web":"1:1056200996320:web:dae05bddaff32f78622785","windows":"1:1056200996320:web:a500da129043d999622785"}}}}}}

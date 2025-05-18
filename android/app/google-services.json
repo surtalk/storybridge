@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1056200996320",
+    "project_id": "storybridgeapp-4993a",
+    "storage_bucket": "storybridgeapp-4993a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1056200996320:android:175d85e5b7b16a68622785",
+        "android_client_info": {
+          "package_name": "com.au.StoryBridge"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1056200996320-edlinogi803e33f3uk7l7jhblqp6sv4h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLX_0_Na8_WDLhINW7xWR0vKSwQdstFKc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1056200996320-edlinogi803e33f3uk7l7jhblqp6sv4h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
