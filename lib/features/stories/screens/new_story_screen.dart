@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'story_editor_screen.dart'; // Adjust this path if needed
+import 'story_editor_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class NewStoryScreen extends StatefulWidget {
   const NewStoryScreen({super.key});
@@ -22,6 +23,14 @@ class _NewStoryScreenState extends State<NewStoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text('New Story')),
+        body: Center(child: Text('You must be logged in to create a story.')),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Create New Story')),
       body: Padding(

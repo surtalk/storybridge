@@ -24,7 +24,8 @@ class LoginScreen extends StatelessWidget {
                       .doc(user.user!.uid)
                       .get();
               bool isApproved = doc['isApproved'] ?? false;
-
+              print(isApproved);
+              print("the approved flag ");
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(

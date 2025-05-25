@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -97,6 +99,49 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
         _storyPages[index].webImageBytes = null;
       }
     });
+  }
+
+  Future<void> _saveStoryToFirestore() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final storyRef =
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('stories')
+            .doc(); // auto-id
+
+    final storyId = storyRef.id;
+
+    final storyData = {
+      'title': widget.storyTitle,
+      'createdAt': Timestamp.now(),
+      'isActive': true,
+      'storyId': storyId,
+    };
+
+    await storyRef.set(storyData);
+
+    for (int i = 0; i < _storyPages.length; i++) {
+      final page = _storyPages[i];
+
+      final pageData = {
+        'text': page.text,
+        'imageUrl': page.imageUrl,
+        'pageNumber': i + 1,
+        'createdAt': Timestamp.now(),
+        'isActive': true,
+      };
+
+      await storyRef.collection('pages').add(pageData);
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Story saved successfully!')));
+
+    Navigator.pop(context); // go back to Home screen
   }
 
   @override
@@ -283,10 +328,21 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addNewPage,
-        icon: const Icon(Icons.add),
-        label: const Text('Add New Page'),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            onPressed: _addNewPage,
+            icon: const Icon(Icons.add),
+            label: const Text('Add New Page'),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            onPressed: _saveStoryToFirestore,
+            icon: const Icon(Icons.save),
+            label: const Text('Save Story'),
+          ),
+        ],
       ),
     );
   }
