@@ -1,55 +1,42 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:storybridge_app/features/auth/controller/auth_service.dart';
 import 'package:storybridge_app/features/auth/controller/login_page.dart';
 import 'package:storybridge_app/features/auth/screens/home_screen.dart';
-import 'package:storybridge_app/features/auth/screens/waiting_approval_screen.dart';
-import 'package:storybridge_app/features/auth/services/user_service.dart';
 import 'firebase_options.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-// We'll create this to check approval status
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // ✅ MUST call this BEFORE runApp
+  if (kIsWeb) {
+    await AuthService().handleRedirectLogin(); // will save user if returned
+  }
+
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'StoryBridge',
       debugShowCheckedModeBanner: false,
       home: StreamBuilder<User?>(
-        stream: _auth.authStateChanges(),
+        stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Scaffold(body: Center(child: CircularProgressIndicator()));
-          }
-
-          if (snapshot.hasData) {
-            return FutureBuilder<bool>(
-              future: UserService().isUserApproved(),
-              builder: (context, approvalSnapshot) {
-                if (approvalSnapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  );
-                }
-
-                if (approvalSnapshot.data == true) {
-                  return HomeScreen(); // ✅ Approved user
-                } else {
-                  return WaitingApprovalScreen(); // ⏳ Guest user
-                }
-              },
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
             );
           }
 
-          return LoginScreen(); // 🔐 Not signed in
+          final user = snapshot.data;
+          if (user == null) return LoginScreen();
+          return HomeScreen();
         },
       ),
     );

@@ -11,6 +11,6 @@ class UserService {
     if (user == null) return false;
 
     final doc = await _firestore.collection('users').doc(user.uid).get();
-    return doc.exists && (doc.data()?['approved'] ?? false) == true;
+    return doc.exists && (doc.data()?['isApproved'] ?? false) == true;
   }
 }
