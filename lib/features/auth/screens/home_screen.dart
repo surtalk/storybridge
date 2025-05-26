@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:storybridge_app/features/auth/controller/auth_service.dart';
 import 'package:storybridge_app/features/auth/controller/login_page.dart';
-
+import 'package:storybridge_app/features/auth/screens/slideshow_screen.dart';
 import 'package:storybridge_app/features/stories/screens/new_story_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -68,7 +68,6 @@ class HomeScreen extends StatelessWidget {
                       .collection('users')
                       .doc(user?.uid)
                       .collection('stories')
-                      .where('isActive', isEqualTo: true)
                       .orderBy('createdAt', descending: true)
                       .snapshots(),
               builder: (context, snapshot) {
@@ -98,10 +97,16 @@ class HomeScreen extends StatelessWidget {
                       ),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
-                        // TODO: Open viewer/editor
-                        // Navigator.push(context, MaterialPageRoute(
-                        //   builder: (_) => ViewStoryScreen(storyId: story.id),
-                        // ));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (_) => SlideshowScreen(
+                                  storyId: story.id,
+                                  userId: user!.uid,
+                                ),
+                          ),
+                        );
                       },
                     );
                   },

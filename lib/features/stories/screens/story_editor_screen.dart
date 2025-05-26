@@ -4,15 +4,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:storybridge_app/features/media/widgets/FullImageScreen.dart';
-import 'package:storybridge_app/features/stories/models/story_page.dart';
-import 'package:storybridge_app/features/media/services/openai_text_service.dart';
-import 'package:storybridge_app/features/media/services/openai_image_service.dart';
 import 'package:storybridge_app/features/media/services/image_picker_service.dart';
+import 'package:storybridge_app/features/media/services/openai_image_service.dart';
+import 'package:storybridge_app/features/media/services/openai_text_service.dart';
+import 'package:storybridge_app/features/stories/models/story.dart';
+import 'package:storybridge_app/features/stories/models/story_page.dart';
 
 class StoryEditorScreen extends StatefulWidget {
   final String storyTitle;
-  static const int maxImagesPerPage = 3;
+
   const StoryEditorScreen({super.key, required this.storyTitle});
 
   @override
@@ -21,84 +21,84 @@ class StoryEditorScreen extends StatefulWidget {
 
 class _StoryEditorScreenState extends State<StoryEditorScreen> {
   final FlutterTts flutterTts = FlutterTts();
-  final List<StoryPage> _storyPages = [StoryPage(text: '', imageUrl: null)];
-  final List<TextEditingController> _controllers = [TextEditingController()];
-  final List<String?> _aiSuggestions = [];
-  final _imageService = OpenAIImageService();
   final _textService = OpenAiTextService();
+  final _imageService = OpenAIImageService();
+  final picker = ImagePickerService();
+
+  final List<StoryPage> _storyPages = [];
+  final List<TextEditingController> _controllers = [];
+  final List<String?> _aiSuggestions = [];
+
+  static const int maxImagesPerPage = 3;
+
   @override
-  void dispose() {
-    for (final controller in _controllers) {
-      controller.dispose();
-    }
-    flutterTts.stop();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _addNewPage();
   }
 
   void _addNewPage() {
     setState(() {
-      _storyPages.add(StoryPage(text: '', imageUrl: null));
+      _storyPages.add(
+        StoryPage(
+          text: '',
+          imageUrls: [],
+          pageNumber: _storyPages.length + 1,
+          createdAt: DateTime.now(),
+          isActive: true,
+        ),
+      );
       _controllers.add(TextEditingController());
       _aiSuggestions.add(null);
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _aiSuggestions.add(null);
-  }
-
-  Future<void> _speak(String text) async {
-    await flutterTts.speak(text);
-  }
-
   Future<void> _generateAISuggestion(int index) async {
-    setState(() {
-      _storyPages[index].isLoading = true;
-    });
-    final prompt = _controllers[index].text;
-    final suggestion = await _textService.fetchAISuggestion(prompt);
-    if (suggestion != null) {
-      setState(() {
-        _aiSuggestions[index] = suggestion;
-        _storyPages[index].isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _generateAIImage(int index) async {
-    setState(() {
-      _storyPages[index].isLoading = true;
-    });
-    if (index >= _controllers.length || index >= _storyPages.length) return;
-
     final prompt = _controllers[index].text;
     if (prompt.isEmpty) return;
 
+    setState(() => _storyPages[index].isLoading = true);
+    final suggestion = await _textService.fetchAISuggestion(prompt);
+
+    setState(() {
+      _aiSuggestions[index] = suggestion;
+      _storyPages[index].isLoading = false;
+    });
+  }
+
+  Future<void> _generateAIImage(int index) async {
+    final prompt = _controllers[index].text;
+    if (prompt.isEmpty ||
+        _storyPages[index].imageUrls.length >= maxImagesPerPage)
+      return;
+
+    setState(() => _storyPages[index].isLoading = true);
+
     final imageUrl = await _imageService.generateImage(prompt);
-    if (imageUrl != null && index < _storyPages.length) {
+    if (imageUrl != null) {
       setState(() {
-        print("image url" + imageUrl);
-        _storyPages[index].imageUrl = imageUrl;
+        _storyPages[index].imageUrls.add(imageUrl);
         _storyPages[index].isLoading = false;
       });
     }
   }
 
   Future<void> _uploadImage(int index) async {
-    final picker = ImagePickerService();
+    if (_storyPages[index].imageUrls.length >= maxImagesPerPage) return;
+
     final (path, bytes) = await picker.pickImageFromGallery();
 
     setState(() {
-      if (kIsWeb) {
-        _storyPages[index].webImageBytes = bytes;
-        _storyPages[index].imageUrl = null;
-      } else {
-        _storyPages[index].imageUrl = path;
-        _storyPages[index].webImageBytes = null;
+      if (kIsWeb && bytes != null) {
+        _storyPages[index].webImageBytes.add(bytes);
+      } else if (path != null) {
+        _storyPages[index].imageUrls.add(path);
       }
     });
+  }
+
+  Future<void> _speak(String text) async {
+    await flutterTts.speak(text);
   }
 
   Future<void> _saveStoryToFirestore() async {
@@ -110,59 +110,117 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
             .collection('users')
             .doc(user.uid)
             .collection('stories')
-            .doc(); // auto-id
+            .doc();
 
     final storyId = storyRef.id;
 
-    final storyData = {
-      'title': widget.storyTitle,
-      'createdAt': Timestamp.now(),
-      'isActive': true,
-      'storyId': storyId,
-    };
+    final story = Story(
+      id: storyId,
+      title: widget.storyTitle,
+      createdAt: DateTime.now(),
+      isActive: true,
+    );
 
-    await storyRef.set(storyData);
+    await storyRef.set(story.toMap());
 
     for (int i = 0; i < _storyPages.length; i++) {
       final page = _storyPages[i];
-
-      final pageData = {
-        'text': page.text,
-        'imageUrl': page.imageUrl,
-        'pageNumber': i + 1,
-        'createdAt': Timestamp.now(),
-        'isActive': true,
-      };
-
-      await storyRef.collection('pages').add(pageData);
+      page.text = _controllers[i].text;
+      page.pageNumber = i + 1;
+      await storyRef.collection('pages').add(page.toMap());
     }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Story saved successfully!')));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Story saved successfully!')),
+      );
+      Navigator.pop(context);
+    }
+  }
 
-    Navigator.pop(context); // go back to Home screen
+  Widget _buildImagePreviews(StoryPage page) {
+    final images = page.imageUrls;
+
+    return Column(
+      children:
+          images.asMap().entries.map((entry) {
+            final index = entry.key;
+            final imagePath = entry.value;
+
+            Widget imageWidget;
+
+            if (kIsWeb && !imagePath.startsWith('http')) {
+              final bytes = page.getWebImageAt(index);
+              imageWidget =
+                  bytes != null
+                      ? Image.memory(
+                        bytes,
+                        width: double.infinity,
+                        height: 150,
+                        fit: BoxFit.cover,
+                        errorBuilder:
+                            (context, error, stackTrace) =>
+                                const Text('Failed to load image'),
+                      )
+                      : const Text('Image not available');
+            } else if (imagePath.startsWith('http')) {
+              // Use proxy for DALL·E and other network images
+              final proxyUrl =
+                  'https://us-central1-storybridgeapp-4993a.cloudfunctions.net/proxyDalleImageGet?url=${Uri.encodeComponent(imagePath)}';
+
+              imageWidget = Image.network(
+                proxyUrl,
+                width: double.infinity,
+                height: 150,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (context, error, stackTrace) =>
+                        const Text('Failed to load image'),
+              );
+            } else {
+              // Local file image
+              imageWidget = Image.file(
+                File(imagePath),
+                width: double.infinity,
+                height: 150,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (context, error, stackTrace) =>
+                        const Text('Failed to load image'),
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: imageWidget,
+            );
+          }).toList(),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _controllers) {
+      controller.dispose();
+    }
+    flutterTts.stop();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Defensive check to avoid index issues
-    if (_controllers.length != _storyPages.length ||
-        _aiSuggestions.length != _storyPages.length) {
-      debugPrint('List lengths are inconsistent!');
-      return const Center(child: CircularProgressIndicator());
-    }
     return Scaffold(
       appBar: AppBar(title: Text(widget.storyTitle)),
       body: ListView.builder(
         itemCount: _storyPages.length,
         itemBuilder: (context, index) {
+          final page = _storyPages[index];
           return Card(
             margin: const EdgeInsets.all(12),
-            elevation: 4,
             child: Padding(
-              padding: const EdgeInsets.all(12.0),
+              padding: const EdgeInsets.all(12),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextField(
                     controller: _controllers[index],
@@ -171,12 +229,9 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
                       labelText: 'Page ${index + 1}',
                       border: const OutlineInputBorder(),
                     ),
-                    onChanged: (value) {
-                      _storyPages[index].text = value;
-                    },
+                    onChanged: (text) => page.text = text,
                   ),
                   const SizedBox(height: 8),
-
                   Row(
                     children: [
                       ElevatedButton.icon(
@@ -192,34 +247,31 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
                       ),
                     ],
                   ),
-                  if (_aiSuggestions.length > index &&
-                      _aiSuggestions[index] != null)
-                    Column(
-                      children: [
-                        const SizedBox(height: 8),
-                        Text(
-                          'AI Suggestion: ${_aiSuggestions[index]!}',
-                          style: const TextStyle(fontStyle: FontStyle.italic),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            _controllers[index].text +=
-                                ' ${_aiSuggestions[index]!}';
-                            _storyPages[index].text = _controllers[index].text;
-                            setState(() {
-                              _aiSuggestions[index] = null;
-                            });
-                          },
-                          child: const Text('Accept Suggestion'),
-                        ),
-                      ],
+                  if (_aiSuggestions[index] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('AI Suggestion: ${_aiSuggestions[index]!}'),
+                          TextButton(
+                            onPressed: () {
+                              final suggestion = _aiSuggestions[index]!;
+                              _controllers[index].text += ' $suggestion';
+                              page.text = _controllers[index].text;
+                              setState(() => _aiSuggestions[index] = null);
+                            },
+                            child: const Text('Accept Suggestion'),
+                          ),
+                        ],
+                      ),
                     ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       ElevatedButton.icon(
                         onPressed: () => _generateAIImage(index),
-                        icon: const Icon(Icons.image_search),
+                        icon: const Icon(Icons.image),
                         label: const Text('AI Image'),
                       ),
                       const SizedBox(width: 8),
@@ -230,98 +282,12 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
                       ),
                     ],
                   ),
-                  if (_storyPages[index].isLoading)
+                  if (page.isLoading)
                     const Padding(
-                      padding: EdgeInsets.only(top: 12),
+                      padding: EdgeInsets.all(8),
                       child: Center(child: CircularProgressIndicator()),
                     ),
-                  if (_storyPages[index].imageUrl != null ||
-                      _storyPages[index].webImageBytes != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => FullImageScreen(
-                                    imageUrl:
-                                        _storyPages[index].imageUrl!.startsWith(
-                                              'http',
-                                            )
-                                            ? 'https://us-central1-storybridgeapp-4993a.cloudfunctions.net/proxyDalleImageGet?url=${Uri.encodeComponent(_storyPages[index].imageUrl!)}'
-                                            : _storyPages[index].imageUrl,
-                                    imageBytes:
-                                        _storyPages[index].webImageBytes,
-                                  ),
-                            ),
-                          );
-                        },
-                        child:
-                            kIsWeb
-                                ? _storyPages[index].imageUrl != null &&
-                                        _storyPages[index].imageUrl!.startsWith(
-                                          'http',
-                                        )
-                                    ? Image.network(
-                                      'https://us-central1-storybridgeapp-4993a.cloudfunctions.net/proxyDalleImageGet?url=${Uri.encodeComponent(_storyPages[index].imageUrl!)}',
-                                      width: double.infinity,
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              const Text(
-                                                'Failed to load image.',
-                                                style: TextStyle(
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                    )
-                                    : Image.memory(
-                                      _storyPages[index].webImageBytes!,
-                                      width: double.infinity,
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              const Text(
-                                                'Failed to load image.',
-                                                style: TextStyle(
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                    )
-                                : _storyPages[index].imageUrl != null &&
-                                    _storyPages[index].imageUrl!.startsWith(
-                                      'http',
-                                    )
-                                ? Image.network(
-                                  'https://us-central1-storybridgeapp-4993a.cloudfunctions.net/proxyDalleImageGet?url=${Uri.encodeComponent(_storyPages[index].imageUrl!)}',
-                                  width: double.infinity,
-                                  height: 200,
-                                  fit: BoxFit.cover,
-                                  errorBuilder:
-                                      (context, error, stackTrace) =>
-                                          const Text(
-                                            'Failed to load image.',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                )
-                                : Image.file(
-                                  File(_storyPages[index].imageUrl!),
-                                  width: double.infinity,
-                                  height: 200,
-                                  fit: BoxFit.cover,
-                                  errorBuilder:
-                                      (context, error, stackTrace) =>
-                                          const Text(
-                                            'Failed to load image.',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                ),
-                      ),
-                    ),
+                  _buildImagePreviews(page),
                 ],
               ),
             ),
@@ -334,7 +300,7 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
           FloatingActionButton.extended(
             onPressed: _addNewPage,
             icon: const Icon(Icons.add),
-            label: const Text('Add New Page'),
+            label: const Text('Add Page'),
           ),
           const SizedBox(height: 12),
           FloatingActionButton.extended(

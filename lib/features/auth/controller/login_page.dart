@@ -17,23 +17,41 @@ class LoginScreen extends StatelessWidget {
           label: Text("Sign in with Google"),
           onPressed: () async {
             UserCredential? user = await _authService.signInWithGoogle();
+
             if (user != null) {
-              final doc =
-                  await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(user.user!.uid)
-                      .get();
-              bool isApproved = doc['isApproved'] ?? false;
-              print(isApproved);
-              print("the approved flag ");
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (_) =>
-                          isApproved ? HomeScreen() : WaitingApprovalScreen(),
-                ),
-              );
+              final userId = user.user!.uid;
+
+              try {
+                final doc =
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(userId)
+                        .get();
+
+                bool isApproved = false;
+
+                if (doc.exists) {
+                  final data = doc.data();
+                  isApproved = data?['isApproved'] ?? false;
+                  print("came here isApproved: $isApproved");
+                }
+
+                print("isApproved: $isApproved");
+
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => isApproved ? HomeScreen() : HomeScreen(),
+                  ),
+                );
+              } catch (e) {
+                print('Error checking approval status: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Login failed: Unable to verify approval.'),
+                  ),
+                );
+              }
             }
           },
         ),
