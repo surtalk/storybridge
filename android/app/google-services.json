@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "1056200996320-1b0r0ujse59og7bo6kbjkq4u56booafv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.au.StoryBridge",
+            "certificate_hash": "c08d1eabd4e9acc215fcd6f9242d0492d93825a9"
+          }
+        },
+        {
           "client_id": "1056200996320-edlinogi803e33f3uk7l7jhblqp6sv4h.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +37,13 @@
             {
               "client_id": "1056200996320-edlinogi803e33f3uk7l7jhblqp6sv4h.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "1056200996320-99go0g0csl52qk1p3sm6r3ejp2vbf5ml.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.storybridgeApp"
+              }
             }
           ]
         }
